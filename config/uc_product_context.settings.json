@@ -1,0 +1,12 @@
+{
+    "_config_name": "uc_product_context.settings",
+    "uc_product_context_display_if_purchased": [],
+    "uc_product_context_display_if_purchased_label": "(previously purchased)",
+    "uc_product_context_display_if_purchased_message": "You have previously purchased this product.",
+    "uc_product_context_disable_add_if_purchased": [],
+    "uc_product_context_display_if_in_cart": [],
+    "uc_product_context_display_if_in_cart_label": "(currently in cart)",
+    "uc_product_context_display_if_in_cart_message": "This product is currently in your cart.",
+    "uc_product_context_disable_add_if_in_cart": [],
+    "uc_product_context_disable_qty_if_in_cart": []
+}

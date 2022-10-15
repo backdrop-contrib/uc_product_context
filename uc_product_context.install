@@ -1,0 +1,47 @@
+<?php
+/**
+ * @file
+ * Ubercart Product Context module installation
+ */
+
+/**
+ * Implements hook_uninstall().
+().
+ */
+function uc_product_context_uninstall() {
+  config_clear('uc_product_context.settings', 'uc_product_context_display_if_purchased');
+  config_clear('uc_product_context.settings', 'uc_product_context_display_if_purchased_label');
+  config_clear('uc_product_context.settings', 'uc_product_context_display_if_purchased_message');
+  config_clear('uc_product_context.settings', 'uc_product_context_disable_add_if_purchased');
+  config_clear('uc_product_context.settings', 'uc_product_context_display_if_in_cart');
+  config_clear('uc_product_context.settings', 'uc_product_context_display_if_in_cart_label');
+  config_clear('uc_product_context.settings', 'uc_product_context_display_if_in_cart_message');
+  config_clear('uc_product_context.settings', 'uc_product_context_disable_add_if_in_cart');
+}
+
+/**
+ * Convert Product Context variables to config.
+ */
+function uc_product_context_update_1000() {
+  $config = config('uc_product_context.settings');
+  $config->set('uc_product_context_display_if_purchased', update_variable_get('uc_product_context_display_if_purchased', array()));
+  $config->set('uc_product_context_display_if_purchased_label', update_variable_get('uc_product_context_display_if_purchased_label', '(previously purchased)'));
+  $config->set('uc_product_context_display_if_purchased_message', update_variable_get('uc_product_context_display_if_purchased_message', 'You have previously purchased this product.'));
+  $config->set('uc_product_context_disable_add_if_purchased', update_variable_get('uc_product_context_disable_add_if_purchased', array()));
+  $config->set('uc_product_context_display_if_in_cart', update_variable_get('uc_product_context_display_if_in_cart', array()));
+  $config->set('uc_product_context_display_if_in_cart_label', update_variable_get('uc_product_context_display_if_in_cart_label', '(currently in cart)'));
+  $config->set('uc_product_context_display_if_in_cart_message', update_variable_get('uc_product_context_display_if_in_cart_message', 'This product is currently in your cart.'));
+  $config->set('uc_product_context_disable_add_if_in_cart', update_variable_get('uc_product_context_disable_add_if_in_cart', array()));
+  $config->set('uc_product_context_disable_qty_if_in_cart', update_variable_get('uc_product_context_disable_qty_if_in_cart', array()));
+  $config->save();
+
+  update_variable_del('uc_product_context_display_if_purchased');
+  update_variable_del('uc_product_context_display_if_purchased_label');
+  update_variable_del('uc_product_context_display_if_purchased_message');
+  update_variable_del('uc_product_context_disable_add_if_purchased');
+  update_variable_del('uc_product_context_display_if_in_cart');
+  update_variable_del('uc_product_context_display_if_in_cart_label');
+  update_variable_del('uc_product_context_display_if_in_cart_message');
+  update_variable_del('uc_product_context_disable_add_if_in_cart');
+  update_variable_del('uc_product_context_disable_qty_if_in_cart');
+}

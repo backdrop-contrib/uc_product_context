@@ -1,0 +1,8 @@
+name = Ubercart Product Context
+description = Modify catalog, product, and cart forms based on whether customer previously purchased the product or it is already in the cart.
+dependencies[] = ubercart
+package = Ubercart - extra
+backdrop = 1.x
+type = module
+
+configure = admin/store/settings/prev-purchase
