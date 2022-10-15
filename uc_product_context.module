@@ -1,0 +1,249 @@
+<?php
+/**
+ * @file
+ * Module to modify products and forms based on whether seller has previously
+ * purchased the product.
+ */
+
+/**
+ * Implements hook_menu().
+ */
+function uc_product_context_menu() {
+  $items = array();
+
+  $items['admin/store/settings/prev-purchase'] = array(
+    'title' => 'Product context',
+    'description' => 'Configure form changes when buyer has previously purchased a product.',
+    'page callback' => 'backdrop_get_form',
+    'page arguments' => array('uc_product_context_settings_form'),
+    'file' => 'uc_product_context.admin.inc',
+    'access arguments' => array('administer store'),
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_config_info().
+ */
+function uc_product_context_config_info() {
+  $prefixes['uc_product_context.settings'] = array(
+    'label' => t('Product Context settings'),
+    'group' => t('Configuration'),
+  );
+  return $prefixes;
+}
+
+/**
+ * Implements hook_form_BASE_FORM_ID_alter() for uc_catalog_buy_it_now_form().
+ *
+ * Buy it now button in catalog listing
+ */
+function uc_product_context_form_uc_catalog_buy_it_now_form_alter(&$form, &$form_state, $form_id) {
+  $nid = $form['nid']['#value'];
+  $context = _uc_product_context_get_context($nid);
+  if ($context['disable_buy_it_now']) {
+    unset($form['actions']['submit']);
+  }
+  $form += $context['add_to_buy_it_now'];
+}
+
+/**
+ * Implements hook_form_BASE_FORM_ID_alter() for uc_product_add_to_cart_form().
+ *
+ * Add to cart button on product page
+ */
+function uc_product_context_form_uc_product_add_to_cart_form_alter(&$form, &$form_state, $form_id) {
+  $nid = $form['nid']['#value'];
+  $context = _uc_product_context_get_context($nid);
+  if ($context['disable_add_to_cart']) {
+    unset($form['actions']['submit']);
+  }
+  $form += $context['add_to_add_to_cart'];
+}
+
+/**
+ * Implements hook_uc_form_BASE_FORM_ID_alter() for uc_product_kit_add_to_cart_form().
+ *
+ * Add to cart button on product page
+ */
+function uc_product_context_form_uc_product_kit_add_to_cart_form_alter(&$form, &$form_state, $form_id) {
+  $nid = $form['nid']['#value'];
+  $context = _uc_product_context_get_context($nid);
+  if ($context['disable_add_to_cart']) {
+    unset($form['actions']['submit']);
+  }
+  $form += $context['add_to_add_to_cart'];
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter() for uc_cart_view_form().
+ *
+ * Shopping cart display
+ */
+function uc_product_context_form_uc_cart_view_form_alter(&$form, &$form_state, $form_id) {
+  foreach ($form['items'] as &$item) {
+    if (!is_array($item)) {
+      continue;
+    }
+    if (!isset($item['nid'])) {
+      continue;
+    }
+    $nid = $item['nid']['#value'];
+    // This is sorta hacky. The only way I can find to get this information into
+    // the table is to render it and then append it to the 'desc' field that's
+    // already being used for the title link.
+    $context = _uc_product_context_get_context($nid);
+    foreach ($context['add_to_cart_desc'] as $key => $elem) {
+      $item['desc']['#markup'] .= backdrop_render($elem);
+    }
+    if ($context['disable_qty']) {
+      $item['qty']['#disabled'] = TRUE;
+    }
+  }
+}
+
+/**
+ * Returns the product context, which describes how different forms are altered
+ * for products that are previously purchased, etc.
+ *
+ * @return array
+ *   Associative array describing modifications to cart display. Elements are:
+ *     - purchased: flag to let other altering modules know this info
+ *     - in_cart: flag to let other altering modules know this info
+ *     - add_to_buy_it_now: render array of elements to add to 'buy it now' form
+ *     - add_to_buy_it_now: render array of elements to add to 'buy it now' form
+ *     - disable_buy_it_now: whether to disable the 'buy it now' button
+ *     - add_to_add_to_cart: render array of elements to add to 'add_to_cart' form
+ *     - disable_add_to_cart: whether to disable the 'add to cart' button
+ *     - disable_qty: whether to disable the 'qty' field
+ *     - add_to_cart_desc: render array of elements to add to item 'desc' field in cart
+ *
+ * Other modules can further modify the context via hook_uc_product_context_alter().
+ *
+ * @see hook_uc_product_context_alter()
+ */
+function _uc_product_context_get_context($nid) {
+  $context = &backdrop_static(__FUNCTION__ . "_{$nid}");
+  if (isset($context)) {
+    return $context;
+  }
+  $config = config('uc_product_context.settings');
+  $type = _uc_product_context_node_type($nid);
+  // Default context (no changes)
+  $context = array(
+    'purchased' => FALSE,
+    'in_cart' => FALSE,
+    'add_to_buy_it_now' => array(),
+    'disable_buy_it_now' => FALSE,
+    'add_to_add_to_cart' => array(),
+    'disable_add_to_cart' => FALSE,
+    'disable_qty' => FALSE,
+    'add_to_cart_desc' => array(),
+  );
+  // Alterations if product was purchased
+  if (_uc_product_context_purchased($nid)) {
+    $context['purchased'] = TRUE;
+    $disable_add_buy = array_filter($config->get('uc_product_context_disable_add_if_purchased'));
+    $context['disable_buy_it_now'] |= isset($disable_add_buy[$type]);
+    $context['disable_add_to_cart'] |= isset($disable_add_buy[$type]);
+    $display_if_purchased = array_filter($config->get('uc_product_context_display_if_purchased'));
+    if (isset($display_if_purchased[$type])) {
+      $label = array(
+        '#prefix' => '<div class="label-previously-purchased">',
+        '#markup' => $config->get('uc_product_context_display_if_purchased_label'),
+        '#suffix' => '</div>',
+      );
+      $message = array(
+        '#prefix' => '<div class="message-previously-purchased">',
+        '#markup' => $config->get('uc_product_context_display_if_purchased_message'),
+        '#suffix' => '</div>',
+      );
+      $context['add_to_buy_it_now']['purchased'] = $label;
+      $context['add_to_add_to_cart']['purchased'] = $message;
+      $context['add_to_cart_desc']['purchased'] = $label;
+    }
+  }
+  // Alterations if product is currently in cart
+  if (_uc_product_context_in_cart($nid)) {
+    $context['in_cart'] = TRUE;
+    $disable_add_buy = array_filter($config->get('uc_product_context_disable_add_if_in_cart'));
+    $context['disable_buy_it_now'] |= isset($disable_add_buy[$type]);
+    $context['disable_add_to_cart'] |= isset($disable_add_buy[$type]);
+    $disable_qty = array_filter($config->get('uc_product_context_disable_qty_if_in_cart'));
+    $context['disable_qty'] |= isset($disable_qty[$type]);
+    $display_if_in_cart = array_filter($config->get('uc_product_context_display_if_in_cart'));
+    if (isset($display_if_in_cart[$type])) {
+      $label = array(
+        '#prefix' => '<div class="label-currently-in-cart">',
+        '#markup' => filter_xss($config->get('uc_product_context_display_if_in_cart_label')),
+        '#suffix' => '</div>',
+      );
+      $message = array(
+        '#prefix' => '<div class="message-currently-in-cart">',
+        '#markup' => filter_xss($config->get('uc_product_context_display_if_in_cart_message')),
+        '#suffix' => '</div>',
+      );
+      $context['add_to_buy_it_now']['in_cart'] = $label;
+      $context['add_to_add_to_cart']['in_cart'] = $message;
+    }
+  }
+  backdrop_alter('uc_product_context', $context, $nid);
+  return $context;
+}
+
+/**
+ * Returns whether the current user ever purchased the given product. Only
+ * consider completed orders.
+ */
+function _uc_product_context_purchased($nid) {
+  $purchased = &backdrop_static(__FUNCTION__ . "_{$nid}");
+  if (isset($purchased)) {
+    return $purchased;
+  }
+  global $user;
+  $result = db_query('
+    SELECT COUNT(1)
+    FROM {uc_order_products} AS op
+    LEFT JOIN {uc_orders} AS o ON op.order_id = o.order_id
+    WHERE order_status IN (:statuses)
+    AND op.nid = :nid
+    AND o.uid = :uid
+    ', array(
+      ':statuses' => array('payment_received', 'completed'),
+      ':nid' => $nid,
+      ':uid' => $user->uid,
+    ))
+    ->fetchField();
+  $purchased = !!$result;
+  return $purchased;
+}
+
+/**
+ * Returns whether this product is currently in the cart.
+ */
+function _uc_product_context_in_cart($nid) {
+  $items = uc_cart_get_contents();
+  foreach ($items as $item) {
+    if ($item->nid == $nid) {
+      return TRUE;
+    }
+    if (isset($item->data['kit_id']) && $item->data['kit_id'] == $nid) {
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+
+/**
+ * Returns the type of this node without loading the entire node.
+ */
+function _uc_product_context_node_type($nid) {
+  $result = db_query('
+    SELECT type
+    FROM {node}
+    WHERE nid = :nid
+    ', array(':nid' => $nid))
+    ->fetchField();
+  return $result;
+}
